@@ -1,0 +1,139 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diabetes App</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #eef0f4; min-height: 100vh; }
+    .topbar { background: #1f6feb; }
+    .topbar .brand { color: #fff; font-weight: 600; text-decoration: none; }
+    .topbar .user { color: #fff; margin-right: 0.8rem; }
+    .main-card { border: 0; box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08); }
+    .btn-primary { background: #1f6feb; border-color: #1f6feb; }
+    .result-card { border: 0; box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08); }
+    .result-ok { background: #d2ece4; color: #155e4d; border: 1px solid #bddfcf; }
+    .result-risk { background: #f8d7da; color: #842029; border: 1px solid #f1b0b7; }
+    .footer { color: #6c757d; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+<nav class="navbar topbar px-3 py-2">
+  <a class="brand" href="/predict/">Diabetes App</a>
+  <div class="d-flex align-items-center">
+    <span class="user">Hola, {{ request.user.username }}</span>
+    <a href="/logout/" class="btn btn-outline-light btn-sm">Cerrar sesion</a>
+  </div>
+</nav>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card main-card mb-4">
+        <div class="card-body p-4">
+          <h2 class="h2 mb-2">Formulario de Prediccion</h2>
+          <p class="text-secondary mb-4">Introduce los valores y pulsa <strong>Predecir</strong>.</p>
+
+          <form method="post" action="/predict/" id="predictForm">
+            {% csrf_token %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="pregnancies">Embarazos</label>
+                <input class="form-control" id="pregnancies" name="pregnancies" type="number" step="0.1" value="{{ values.pregnancies }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="glucose">Glucosa</label>
+                <input class="form-control" id="glucose" name="glucose" type="number" step="0.1" value="{{ values.glucose }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="bloodpressure">Presion Arterial</label>
+                <input class="form-control" id="bloodpressure" name="bloodpressure" type="number" step="0.1" value="{{ values.bloodpressure }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="skinthickness">Grosor de la piel (Skin Thickness)</label>
+                <input class="form-control" id="skinthickness" name="skinthickness" type="number" step="0.1" value="{{ values.skinthickness }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="insulin">Insulina</label>
+                <input class="form-control" id="insulin" name="insulin" type="number" step="0.1" value="{{ values.insulin }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="bmi">BMI</label>
+                <input class="form-control" id="bmi" name="bmi" type="number" step="0.1" value="{{ values.bmi }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="age">Edad</label>
+                <input class="form-control" id="age" name="age" type="number" step="0.1" value="{{ values.age }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="dpf">DPF (calculado)</label>
+                <input class="form-control" id="dpf" name="dpf" type="text" value="{{ values.dpf }}" placeholder="Aqui se mostrara el DPF calculado" readonly>
+              </div>
+            </div>
+
+            <button class="btn btn-primary w-100 mt-4" type="submit">Predecir</button>
+            <p class="text-center text-secondary mt-3 mb-0">Resultado: la prediccion se mostrara en la misma pagina.</p>
+          </form>
+        </div>
+      </div>
+
+      {% if show_result %}
+      <div class="card result-card mb-4">
+        <div class="card-body p-4 text-center">
+          <h4 class="mb-1">DPF calculado: {{ dpf }}</h4>
+          <p class="mb-3">Probabilidad de diabetes: <strong>{{ probability }}%</strong></p>
+
+          {% if has_risk %}
+          <div class="rounded p-3 result-risk">El modelo predice riesgo de diabetes.</div>
+          {% else %}
+          <div class="rounded p-3 result-ok">El modelo no predice riesgo de diabetes.</div>
+          {% endif %}
+
+          <a href="/predict/" class="btn btn-outline-primary mt-3">Reiniciar formulario</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <p class="text-center footer">&copy; 2025 Diabetes Predictor</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toNumber(value) {
+    if (!value) return 0;
+    return parseFloat(String(value).replace(',', '.')) || 0;
+  }
+
+  function calculateDPF() {
+    const pregnancies = toNumber(document.getElementById('pregnancies').value);
+    const glucose = toNumber(document.getElementById('glucose').value);
+    const bloodpressure = toNumber(document.getElementById('bloodpressure').value);
+    const skinthickness = toNumber(document.getElementById('skinthickness').value);
+    const insulin = toNumber(document.getElementById('insulin').value);
+    const bmi = toNumber(document.getElementById('bmi').value);
+    const age = toNumber(document.getElementById('age').value);
+
+    const raw = 0.30
+      + (0.0008 * glucose)
+      + (0.0020 * bmi)
+      + (0.0007 * age)
+      - (0.0005 * bloodpressure)
+      + (0.0003 * pregnancies)
+      + (0.0002 * skinthickness)
+      + (0.0004 * insulin);
+
+    const bounded = Math.max(0.01, Math.min(0.99, raw));
+    document.getElementById('dpf').value = bounded.toFixed(5);
+  }
+
+  const trackedIds = ['pregnancies', 'glucose', 'bloodpressure', 'skinthickness', 'insulin', 'bmi', 'age'];
+  trackedIds.forEach((id) => {
+    const element = document.getElementById(id);
+    element.addEventListener('input', calculateDPF);
+  });
+  calculateDPF();
+</script>
+</body>
+</html>

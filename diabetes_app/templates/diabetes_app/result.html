@@ -1,0 +1,25 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Resultado</title>
+</head>
+<body>
+  <h2>Resultado de la prediccion</h2>
+  <p>
+    {% if method == "manual" %}
+      Metodo: manual (sin model.pkl).
+    {% else %}
+      Metodo: modelo entrenado.
+    {% endif %}
+  </p>
+  <p>
+    {% if result == 1 %}
+      El resultado es: POSITIVO (posible diabetes).
+    {% else %}
+      El resultado es: NEGATIVO (sin diabetes).
+    {% endif %}
+  </p>
+  <a href="/">Volver</a>
+</body>
+</html>
