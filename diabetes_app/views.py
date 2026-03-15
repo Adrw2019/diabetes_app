@@ -8,8 +8,12 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib.auth.views import PasswordResetView
+from django.core.mail import send_mail
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 APP_DIR = os.path.join(settings.BASE_DIR, "diabetes_app")
 MODEL_PATH = os.path.join(APP_DIR, "model.pkl")
@@ -29,20 +33,6 @@ def safe_load(path):
     except Exception:
         logging.exception("Error cargando pickle: %s", path)
         return None
-
-
-def calculate_dpf(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, age):
-    raw = (
-        0.30
-        + 0.0008 * glucose
-        + 0.0020 * bmi
-        + 0.0007 * age
-        - 0.0005 * bloodpressure
-        + 0.0003 * pregnancies
-        + 0.0002 * skinthickness
-        + 0.0004 * insulin
-    )
-    return max(0.01, min(0.99, raw))
 
 
 def manual_probability(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age):
@@ -68,20 +58,75 @@ def parse_input(request):
     skinthickness = float(request.POST.get("skinthickness", 0))
     insulin = float(request.POST.get("insulin", 0))
     bmi = float(request.POST.get("bmi", 0))
+    dpf = float(request.POST.get("dpf", 0))
     age = float(request.POST.get("age", 0))
-    return pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, age
+    source_confirmed = request.POST.get("source_confirmed") == "on"
+    return pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age, source_confirmed
+
+
+def validate_ranges(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age):
+    return (
+        0 <= pregnancies <= 6
+        and 44 <= glucose <= 199
+        and 24 <= bloodpressure <= 122
+        and 7 <= skinthickness <= 99
+        and 14 <= insulin <= 846
+        and 18.2 <= bmi <= 67.1
+        and 0.078 <= dpf <= 2.42
+        and 18 <= age <= 90
+    )
+
+
+def consistency_issues(glucose, skinthickness, insulin, bmi, dpf):
+    issues = []
+    if bmi > 50 and skinthickness < 10:
+        issues.append("BMI muy alto con grosor de piel muy bajo.")
+    if glucose > 180 and insulin < 30:
+        issues.append("Glucosa muy alta con insulina muy baja.")
+    if insulin > 500 and glucose < 70:
+        issues.append("Insulina muy alta con glucosa muy baja.")
+    if dpf > 2.0:
+        issues.append("DPF demasiado alto, valida el dato.")
+    return issues
 
 
 def root(request):
-    if request.user.is_authenticated:
-        return redirect("diabetes_app:predict")
     return redirect("diabetes_app:login")
 
 
-def login_view(request):
-    if request.user.is_authenticated:
-        return redirect("diabetes_app:predict")
+class CustomPasswordResetView(PasswordResetView):
+    """Permite fijar dominio/protocolo en los enlaces por red local o staging."""
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        fixed_domain = getattr(settings, "PASSWORD_RESET_DOMAIN_OVERRIDE", "")
+        if fixed_domain:
+            kwargs["domain_override"] = fixed_domain
+        fixed_protocol = getattr(settings, "PASSWORD_RESET_PROTOCOL_OVERRIDE", "")
+        if fixed_protocol in {"http", "https"}:
+            kwargs["use_https"] = fixed_protocol == "https"
+        return kwargs
+
+
+def send_welcome_email(user):
+    """Envía un correo de bienvenida; no interrumpe el registro si falla."""
+    try:
+        context = {"username": user.username}
+        html_message = render_to_string("diabetes_app/emails/welcome_email.html", context)
+        plain_message = strip_tags(html_message)
+        send_mail(
+            subject="Bienvenido a Diabetes App",
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=True,
+        )
+    except Exception:
+        logging.exception("No se pudo enviar el correo de bienvenida")
+
+
+def login_view(request):
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
         password = request.POST.get("password", "")
@@ -96,9 +141,6 @@ def login_view(request):
 
 
 def register_view(request):
-    if request.user.is_authenticated:
-        return redirect("diabetes_app:predict")
-
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
         email = request.POST.get("email", "").strip()
@@ -115,6 +157,7 @@ def register_view(request):
             messages.error(request, "Ese correo ya esta registrado.")
         else:
             user = User.objects.create_user(username=username, email=email, password=password)
+            send_welcome_email(user)
             login(request, user)
             return redirect("diabetes_app:predict")
 
@@ -144,12 +187,43 @@ def predict(request):
 
     if request.method == "POST":
         try:
-            pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, age = parse_input(request)
+            pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age, source_confirmed = parse_input(request)
         except Exception:
             logging.exception("Error leyendo variables del formulario")
             return HttpResponse("Datos invalidos en el formulario", status=400)
 
-        dpf = calculate_dpf(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, age)
+        current_values = {
+            "pregnancies": f"{pregnancies:.1f}",
+            "glucose": f"{glucose:.1f}",
+            "bloodpressure": f"{bloodpressure:.1f}",
+            "skinthickness": f"{skinthickness:.1f}",
+            "insulin": f"{insulin:.1f}",
+            "bmi": f"{bmi:.1f}",
+            "age": f"{age:.1f}",
+            "dpf": f"{dpf:.3f}",
+            "source_confirmed": source_confirmed,
+        }
+
+        if not source_confirmed:
+            messages.error(request, "Debes confirmar que los datos vienen de una fuente real (laboratorio/medicion).")
+            context["values"] = current_values
+            return render(request, "diabetes_app/predict_form.html", context)
+
+        if not validate_ranges(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age):
+            messages.error(
+                request,
+                "Verifica rangos reales (segun diabetes_clean.csv): Embarazos 0-6, Glucosa 44-199, Presion 24-122, "
+                "Skin 7-99, Insulina 14-846, BMI 18.2-67.1, DPF 0.078-2.42, Edad 18-90.",
+            )
+            context["values"] = current_values
+            return render(request, "diabetes_app/predict_form.html", context)
+
+        issues = consistency_issues(glucose, skinthickness, insulin, bmi, dpf)
+        if issues:
+            messages.error(request, "Datos sospechosos: " + " | ".join(issues))
+            context["values"] = current_values
+            return render(request, "diabetes_app/predict_form.html", context)
+
         features = [pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age]
 
         probability = None
@@ -203,6 +277,7 @@ def predict(request):
                     "bmi": f"{bmi:.1f}",
                     "age": f"{age:.1f}",
                     "dpf": f"{dpf:.5f}",
+                    "source_confirmed": source_confirmed,
                 },
             }
         )

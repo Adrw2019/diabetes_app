@@ -1,9 +1,11 @@
-﻿<!doctype html>
+<!doctype html>
+{% load static %}
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Diabetes App</title>
+  <title>Diabetes Predictor</title>
+  <link rel="icon" type="image/svg+xml" sizes="any" href="{% static 'diabetes_app/favicon.svg' %}">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background: #eef0f4; min-height: 100vh; }
@@ -20,7 +22,10 @@
 </head>
 <body>
 <nav class="navbar topbar px-3 py-2">
-  <a class="brand" href="/predict/">Diabetes App</a>
+  <a class="brand d-flex align-items-center gap-2" href="/predict/">
+    <img src="{% static 'diabetes_app/logo_white.svg' %}" alt="Logo" width="28" height="28">
+    <span>Diabetes Predictor</span>
+  </a>
   <div class="d-flex align-items-center">
     <span class="user">Hola, {{ request.user.username }}</span>
     <a href="/logout/" class="btn btn-outline-light btn-sm">Cerrar sesion</a>
@@ -33,42 +38,56 @@
       <div class="card main-card mb-4">
         <div class="card-body p-4">
           <h2 class="h2 mb-2">Formulario de Prediccion</h2>
-          <p class="text-secondary mb-4">Introduce los valores y pulsa <strong>Predecir</strong>.</p>
+
+          {% if messages %}
+          {% for message in messages %}
+          <div class="alert alert-warning py-2" role="alert">{{ message }}</div>
+          {% endfor %}
+          {% endif %}
+          <div id="clientError" class="alert alert-danger py-2 d-none" role="alert"></div>
 
           <form method="post" action="/predict/" id="predictForm">
             {% csrf_token %}
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label" for="pregnancies">Embarazos</label>
-                <input class="form-control" id="pregnancies" name="pregnancies" type="number" step="0.1" value="{{ values.pregnancies }}" required>
+                <label class="form-label" for="pregnancies">Embarazos (conteo)</label>
+                <input class="form-control" id="pregnancies" name="pregnancies" type="number" step="1" min="0" max="6" value="{{ values.pregnancies }}" placeholder="Ej: 2" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="glucose">Glucosa</label>
-                <input class="form-control" id="glucose" name="glucose" type="number" step="0.1" value="{{ values.glucose }}" required>
+                <label class="form-label" for="glucose">Glucosa (mg/dL)</label>
+                <input class="form-control" id="glucose" name="glucose" type="number" step="0.1" min="44" max="199" value="{{ values.glucose }}" placeholder="Ej: 110" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="bloodpressure">Presion Arterial</label>
-                <input class="form-control" id="bloodpressure" name="bloodpressure" type="number" step="0.1" value="{{ values.bloodpressure }}" required>
+                <label class="form-label" for="bloodpressure">Presion arterial diastolica (mmHg)</label>
+                <input class="form-control" id="bloodpressure" name="bloodpressure" type="number" step="0.1" min="24" max="122" value="{{ values.bloodpressure }}" placeholder="Ej: 72" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="skinthickness">Grosor de la piel (Skin Thickness)</label>
-                <input class="form-control" id="skinthickness" name="skinthickness" type="number" step="0.1" value="{{ values.skinthickness }}" required>
+                <label class="form-label" for="skinthickness">Grosor de piel tricipital (mm)</label>
+                <input class="form-control" id="skinthickness" name="skinthickness" type="number" step="0.1" min="7" max="99" value="{{ values.skinthickness }}" placeholder="Ej: 23" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="insulin">Insulina</label>
-                <input class="form-control" id="insulin" name="insulin" type="number" step="0.1" value="{{ values.insulin }}" required>
+                <label class="form-label" for="insulin">Insulina (mu U/mL)</label>
+                <input class="form-control" id="insulin" name="insulin" type="number" step="0.1" min="14" max="846" value="{{ values.insulin }}" placeholder="Ej: 94" required>
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="bmi">BMI</label>
-                <input class="form-control" id="bmi" name="bmi" type="number" step="0.1" value="{{ values.bmi }}" required>
+                <input class="form-control" id="bmi" name="bmi" type="number" step="0.1" min="18.2" max="67.1" value="{{ values.bmi }}" placeholder="Ej: 33.6" required>
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="age">Edad</label>
-                <input class="form-control" id="age" name="age" type="number" step="0.1" value="{{ values.age }}" required>
+                <input class="form-control" id="age" name="age" type="number" step="1" min="18" max="90" value="{{ values.age }}" placeholder="Ej: 35" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="dpf">DPF (calculado)</label>
-                <input class="form-control" id="dpf" name="dpf" type="text" value="{{ values.dpf }}" placeholder="Aqui se mostrara el DPF calculado" readonly>
+                <label class="form-label" for="dpf">DPF (Diabetes Pedigree Function)</label>
+                <input class="form-control" id="dpf" name="dpf" type="number" step="0.001" min="0.078" max="2.42" value="{{ values.dpf }}" placeholder="Ej: 0.627" required>
+              </div>
+              <div class="col-12">
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" id="source_confirmed" name="source_confirmed" {% if values.source_confirmed %}checked{% endif %} required>
+                  <label class="form-check-label" for="source_confirmed">
+                    Confirmo que estos datos vienen de una fuente real (laboratorio o medicion clinica).
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -81,7 +100,7 @@
       {% if show_result %}
       <div class="card result-card mb-4">
         <div class="card-body p-4 text-center">
-          <h4 class="mb-1">DPF calculado: {{ dpf }}</h4>
+          <h4 class="mb-1">DPF ingresado: {{ dpf }}</h4>
           <p class="mb-3">Probabilidad de diabetes: <strong>{{ probability }}%</strong></p>
 
           {% if has_risk %}
@@ -101,39 +120,130 @@
 </div>
 
 <script>
-  function toNumber(value) {
-    if (!value) return 0;
-    return parseFloat(String(value).replace(',', '.')) || 0;
+  var fieldRanges = {
+    pregnancies: { min: 0, max: 6, label: "Embarazos" },
+    glucose: { min: 44, max: 199, label: "Glucosa" },
+    bloodpressure: { min: 24, max: 122, label: "Presion arterial diastolica" },
+    skinthickness: { min: 7, max: 99, label: "Grosor de piel tricipital" },
+    insulin: { min: 14, max: 846, label: "Insulina" },
+    bmi: { min: 18.2, max: 67.1, label: "BMI" },
+    age: { min: 18, max: 90, label: "Edad" },
+    dpf: { min: 0.078, max: 2.42, label: "DPF" }
+  };
+
+  function validateField(fieldId) {
+    var config = fieldRanges[fieldId];
+    var input = document.getElementById(fieldId);
+    var raw = String(input.value || "").trim();
+    var value = Number(raw.replace(",", "."));
+
+    if (!raw) {
+      input.setCustomValidity("Este campo es obligatorio.");
+      return false;
+    }
+    if (Number.isNaN(value)) {
+      input.setCustomValidity("Ingresa un numero valido.");
+      return false;
+    }
+    if (value < config.min || value > config.max) {
+      input.setCustomValidity(config.label + " fuera de rango real (" + config.min + " - " + config.max + ").");
+      return false;
+    }
+
+    input.setCustomValidity("");
+    return true;
   }
 
-  function calculateDPF() {
-    const pregnancies = toNumber(document.getElementById('pregnancies').value);
-    const glucose = toNumber(document.getElementById('glucose').value);
-    const bloodpressure = toNumber(document.getElementById('bloodpressure').value);
-    const skinthickness = toNumber(document.getElementById('skinthickness').value);
-    const insulin = toNumber(document.getElementById('insulin').value);
-    const bmi = toNumber(document.getElementById('bmi').value);
-    const age = toNumber(document.getElementById('age').value);
+  function consistencyIssues() {
+    var glucose = Number(String(document.getElementById("glucose").value || "").replace(",", "."));
+    var skinthickness = Number(String(document.getElementById("skinthickness").value || "").replace(",", "."));
+    var insulin = Number(String(document.getElementById("insulin").value || "").replace(",", "."));
+    var bmi = Number(String(document.getElementById("bmi").value || "").replace(",", "."));
+    var dpf = Number(String(document.getElementById("dpf").value || "").replace(",", "."));
+    var issues = [];
 
-    const raw = 0.30
-      + (0.0008 * glucose)
-      + (0.0020 * bmi)
-      + (0.0007 * age)
-      - (0.0005 * bloodpressure)
-      + (0.0003 * pregnancies)
-      + (0.0002 * skinthickness)
-      + (0.0004 * insulin);
-
-    const bounded = Math.max(0.01, Math.min(0.99, raw));
-    document.getElementById('dpf').value = bounded.toFixed(5);
+    if (!Number.isNaN(bmi) && !Number.isNaN(skinthickness) && bmi > 50 && skinthickness < 10) {
+      issues.push("BMI muy alto con grosor de piel muy bajo");
+    }
+    if (!Number.isNaN(glucose) && !Number.isNaN(insulin) && glucose > 180 && insulin < 30) {
+      issues.push("Glucosa muy alta con insulina muy baja");
+    }
+    if (!Number.isNaN(glucose) && !Number.isNaN(insulin) && insulin > 500 && glucose < 70) {
+      issues.push("Insulina muy alta con glucosa muy baja");
+    }
+    if (!Number.isNaN(dpf) && dpf > 2.0) {
+      issues.push("DPF demasiado alto");
+    }
+    return issues;
   }
 
-  const trackedIds = ['pregnancies', 'glucose', 'bloodpressure', 'skinthickness', 'insulin', 'bmi', 'age'];
-  trackedIds.forEach((id) => {
-    const element = document.getElementById(id);
-    element.addEventListener('input', calculateDPF);
+  function clampField(fieldId, onBlur) {
+    var config = fieldRanges[fieldId];
+    var input = document.getElementById(fieldId);
+    var raw = String(input.value || "").trim();
+    if (!raw) return;
+
+    var value = Number(raw.replace(",", "."));
+    if (Number.isNaN(value)) return;
+
+    if (value > config.max) {
+      input.value = config.max;
+    } else if (onBlur && value < config.min) {
+      input.value = config.min;
+    }
+  }
+
+  var fieldIds = Object.keys(fieldRanges);
+  fieldIds.forEach(function (fieldId) {
+    var input = document.getElementById(fieldId);
+    input.addEventListener("input", function () {
+      clampField(fieldId, false);
+      validateField(fieldId);
+    });
+    input.addEventListener("blur", function () {
+      clampField(fieldId, true);
+      validateField(fieldId);
+      input.reportValidity();
+    });
   });
-  calculateDPF();
+
+  document.getElementById("predictForm").addEventListener("submit", function (event) {
+    var hasInvalid = fieldIds.some(function (fieldId) { return !validateField(fieldId); });
+    var clientError = document.getElementById("clientError");
+    var sourceConfirmed = document.getElementById("source_confirmed").checked;
+    var issues = consistencyIssues();
+    if (hasInvalid) {
+      event.preventDefault();
+      clientError.classList.remove("d-none");
+      clientError.textContent = "Hay datos fuera de rango real. Corrige los campos marcados.";
+
+      var firstInvalid = fieldIds.find(function (fieldId) {
+        var input = document.getElementById(fieldId);
+        return !input.checkValidity();
+      });
+      if (firstInvalid) {
+        var input = document.getElementById(firstInvalid);
+        input.focus();
+        input.reportValidity();
+      }
+      return;
+    }
+    if (!sourceConfirmed) {
+      event.preventDefault();
+      clientError.classList.remove("d-none");
+      clientError.textContent = "Debes confirmar que los datos vienen de una fuente real.";
+      document.getElementById("source_confirmed").focus();
+      return;
+    }
+    if (issues.length > 0) {
+      event.preventDefault();
+      clientError.classList.remove("d-none");
+      clientError.textContent = "Datos sospechosos: " + issues.join(" | ");
+      return;
+    }
+    clientError.classList.add("d-none");
+  });
 </script>
 </body>
 </html>
+
