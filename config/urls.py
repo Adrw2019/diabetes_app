@@ -1,8 +1,7 @@
 from django.contrib import admin
-from django.urls import path
-from diabetes_app import views
+from django.urls import include, path
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', views.predict_form, name='home'),
+    path("admin/", admin.site.urls),
+    path("", include("diabetes_app.urls")),
 ]
