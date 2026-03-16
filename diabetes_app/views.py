@@ -2,6 +2,7 @@
 import math
 import os
 import pickle
+from functools import lru_cache
 
 from django.conf import settings
 from django.contrib import messages
@@ -51,6 +52,27 @@ def manual_probability(pregnancies, glucose, bloodpressure, skinthickness, insul
     return max(0.0, min(1.0, probability))
 
 
+@lru_cache(maxsize=1)
+def load_model_and_scaler():
+    """
+    Carga y normaliza artefactos (model.pkl, scaler.pkl).
+    Usa cache en memoria para no leer disco en cada request.
+    Permite que model.pkl sea un tuple (model, scaler) como a veces guarda sklearn.
+    """
+    model = safe_load(MODEL_PATH)
+    scaler = safe_load(SCALER_PATH)
+
+    if isinstance(model, tuple):
+        possible_model = model[0] if len(model) > 0 else None
+        possible_scaler = model[1] if len(model) > 1 else None
+        if possible_model is not None:
+            model = possible_model
+        if scaler is None and possible_scaler is not None:
+            scaler = possible_scaler
+
+    return model, scaler
+
+
 def parse_input(request):
     pregnancies = float(request.POST.get("pregnancies", 0))
     glucose = float(request.POST.get("glucose", 0))
@@ -58,7 +80,7 @@ def parse_input(request):
     skinthickness = float(request.POST.get("skinthickness", 0))
     insulin = float(request.POST.get("insulin", 0))
     bmi = float(request.POST.get("bmi", 0))
-    dpf = float(request.POST.get("dpf", 0))
+    dpf = float(request.POST.get("dpf", 0.373))  # mediana del dataset Pima si no viene
     age = float(request.POST.get("age", 0))
     source_confirmed = request.POST.get("source_confirmed") == "on"
     return pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age, source_confirmed
@@ -66,7 +88,7 @@ def parse_input(request):
 
 def validate_ranges(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age):
     return (
-        0 <= pregnancies <= 6
+        0 <= pregnancies <= 17  # máximo observado en el dataset Pima
         and 44 <= glucose <= 199
         and 24 <= bloodpressure <= 122
         and 7 <= skinthickness <= 99
@@ -212,7 +234,7 @@ def predict(request):
         if not validate_ranges(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age):
             messages.error(
                 request,
-                "Verifica rangos reales (segun diabetes_clean.csv): Embarazos 0-6, Glucosa 44-199, Presion 24-122, "
+                "Verifica rangos reales (segun dataset Pima y criterio clinico): Embarazos 0-17, Glucosa 44-199, Presion 24-122, "
                 "Skin 7-99, Insulina 14-846, BMI 18.2-67.1, DPF 0.078-2.42, Edad 18-90.",
             )
             context["values"] = current_values
@@ -227,19 +249,12 @@ def predict(request):
         features = [pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age]
 
         probability = None
-        model = safe_load(MODEL_PATH)
-        scaler = safe_load(SCALER_PATH)
+        model_source = "manual_formula"
+        model, scaler = load_model_and_scaler()
 
         try:
-            if isinstance(model, tuple):
-                possible_model = model[0] if len(model) > 0 else None
-                possible_scaler = model[1] if len(model) > 1 else None
-                if possible_model is not None:
-                    model = possible_model
-                if scaler is None and possible_scaler is not None:
-                    scaler = possible_scaler
-
             if model is not None:
+                model_source = getattr(model, "__class__", type("obj", (), {})).__name__ or "model.pkl"
                 x_data = [features]
                 if scaler is not None:
                     try:
@@ -252,12 +267,15 @@ def predict(request):
                 else:
                     prediction = int(model.predict(x_data)[0])
                     probability = 0.75 if prediction == 1 else 0.05
+            else:
+                logging.warning("model.pkl/scaler.pkl no encontrados; usando formula manual.")
         except Exception:
             logging.exception("Error con modelo; se usa metodo manual")
             probability = None
 
         if probability is None:
             probability = manual_probability(*features)
+            model_source = "manual_formula"
 
         probability_percent = round(probability * 100, 1)
         has_risk = probability_percent >= 50.0
@@ -268,6 +286,7 @@ def predict(request):
                 "dpf": f"{dpf:.5f}",
                 "probability": f"{probability_percent:.1f}",
                 "has_risk": has_risk,
+                "model_source": model_source,
                 "values": {
                     "pregnancies": f"{pregnancies:.1f}",
                     "glucose": f"{glucose:.1f}",

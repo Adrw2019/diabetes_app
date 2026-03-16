@@ -51,7 +51,7 @@
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label" for="pregnancies">Embarazos (conteo)</label>
-                <input class="form-control" id="pregnancies" name="pregnancies" type="number" step="1" min="0" max="6" value="{{ values.pregnancies }}" placeholder="Ej: 2" required>
+                <input class="form-control" id="pregnancies" name="pregnancies" type="number" step="1" min="0" max="17" value="{{ values.pregnancies }}" placeholder="Ej: 1" required>
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="glucose">Glucosa (mg/dL)</label>
@@ -79,7 +79,7 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="dpf">DPF (Diabetes Pedigree Function)</label>
-                <input class="form-control" id="dpf" name="dpf" type="number" step="0.001" min="0.078" max="2.42" value="{{ values.dpf }}" placeholder="Ej: 0.627" required>
+                <input class="form-control" id="dpf" name="dpf" type="number" step="0.001" min="0.078" max="2.42" value="{{ values.dpf }}" placeholder="Se completa automaticamente" required>
               </div>
               <div class="col-12">
                 <div class="form-check mt-2">
@@ -102,13 +102,7 @@
         <div class="card-body p-4 text-center">
           <h4 class="mb-1">DPF ingresado: {{ dpf }}</h4>
           <p class="mb-3">Probabilidad de diabetes: <strong>{{ probability }}%</strong></p>
-
-          {% if has_risk %}
-          <div class="rounded p-3 result-risk">El modelo predice riesgo de diabetes.</div>
-          {% else %}
-          <div class="rounded p-3 result-ok">El modelo no predice riesgo de diabetes.</div>
-          {% endif %}
-
+          <!-- Se omite mensaje de 'no riesgo' para evitar falsa sensación de seguridad -->
           <a href="/predict/" class="btn btn-outline-primary mt-3">Reiniciar formulario</a>
         </div>
       </div>
@@ -121,7 +115,7 @@
 
 <script>
   var fieldRanges = {
-    pregnancies: { min: 0, max: 6, label: "Embarazos" },
+    pregnancies: { min: 0, max: 17, label: "Embarazos" },
     glucose: { min: 44, max: 199, label: "Glucosa" },
     bloodpressure: { min: 24, max: 122, label: "Presion arterial diastolica" },
     skinthickness: { min: 7, max: 99, label: "Grosor de piel tricipital" },
@@ -130,6 +124,16 @@
     age: { min: 18, max: 90, label: "Edad" },
     dpf: { min: 0.078, max: 2.42, label: "DPF" }
   };
+
+  var DEFAULT_DPF = 0.373; // mediana del dataset Pima
+
+  function autofillDpfIfEmpty() {
+    var dpfInput = document.getElementById("dpf");
+    var raw = String(dpfInput.value || "").trim();
+    if (!raw) {
+      dpfInput.value = DEFAULT_DPF.toFixed(3);
+    }
+  }
 
   function validateField(fieldId) {
     var config = fieldRanges[fieldId];
@@ -174,6 +178,12 @@
     if (!Number.isNaN(dpf) && dpf > 2.0) {
       issues.push("DPF demasiado alto");
     }
+    if (!Number.isNaN(glucose)) {
+      var preg = Number(String(document.getElementById("pregnancies").value || "").replace(",", "."));
+      if (!Number.isNaN(preg) && preg > 10) {
+        issues.push("Embarazos >10 son poco frecuentes; verifica el dato");
+      }
+    }
     return issues;
   }
 
@@ -199,6 +209,9 @@
     input.addEventListener("input", function () {
       clampField(fieldId, false);
       validateField(fieldId);
+      if (fieldId !== "dpf") {
+        autofillDpfIfEmpty();
+      }
     });
     input.addEventListener("blur", function () {
       clampField(fieldId, true);
@@ -206,6 +219,8 @@
       input.reportValidity();
     });
   });
+
+  autofillDpfIfEmpty();
 
   document.getElementById("predictForm").addEventListener("submit", function (event) {
     var hasInvalid = fieldIds.some(function (fieldId) { return !validateField(fieldId); });
