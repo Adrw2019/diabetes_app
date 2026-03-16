@@ -113,10 +113,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-if os.getenv("EMAIL_HOST"):
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
@@ -124,6 +120,21 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true" and not EMAIL_USE_SSL
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@diabetes.local")
+
+# Backend de correo:
+# - En desarrollo: consola.
+# - En producción: exige SMTP configurado (evita que en Render se quede en consola).
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    if EMAIL_HOST:
+        EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "Configura SMTP en variables de entorno: EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD."
+        )
 
 # Opcional: fuerza dominio/protocolo en enlaces de reseteo (útil al abrir desde móvil en red local)
 PASSWORD_RESET_DOMAIN_OVERRIDE = os.getenv("PASSWORD_RESET_DOMAIN_OVERRIDE", "")
