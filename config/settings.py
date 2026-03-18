@@ -20,11 +20,9 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ALLOWED_HOSTS desde variable, por defecto el dominio de Render de tu app.
-# En Render configura ALLOWED_HOSTS = diabetes-app-eby0.onrender.com
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS", "diabetes-app-eby0.onrender.com"
 ).split(",")
-
 
 # Application definition
 
@@ -40,7 +38,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    # WhiteNoise para servir static files en producción sin servidor adicional
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -70,8 +67,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database
-# Por ahora usa sqlite (ok para pruebas). En producción recomienda Postgres.
+# Database (sqlite por ahora)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -79,21 +75,11 @@ DATABASES = {
     }
 }
 
-# Si prefieres Postgres en Render, crea DB y pega DATABASE_URL y te indico cómo.
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 # Internationalization
@@ -111,13 +97,14 @@ EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true" and not EMAIL_USE_SSL
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@diabetes.local")
 
-if DEBUG:
+# Permite forzar el backend de consola para entornos de desarrollo o despliegues iniciales
+# En Render: si no configuras SMTP y no quieres excepción, pon ALLOW_CONSOLE_EMAIL=True
+if os.environ.get("ALLOW_CONSOLE_EMAIL", "True") == "True" or DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
     if EMAIL_HOST:
         EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     else:
-        # Si no configuras SMTP en producción y DEBUG=False, lanzará excepción para evitar envíos silenciosos
         from django.core.exceptions import ImproperlyConfigured
 
         raise ImproperlyConfigured(
@@ -127,11 +114,10 @@ else:
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]  # si tienes carpeta static/ en la raíz
-# WhiteNoise storage para producción
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Seguridad adicional (opcional pero recomendado en producción)
+# Seguridad adicional (opcional)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
