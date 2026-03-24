@@ -24,7 +24,8 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ALLOWED_HOSTS desde variable, por defecto el dominio de Render de tu app.
 ALLOWED_HOSTS = os.environ.get(
-    "ALLOWED_HOSTS", "diabetes-app-eby0.onrender.com"
+    "ALLOWED_HOSTS",
+    "diabetes-app-eby0.onrender.com,127.0.0.1,localhost,[::1]",
 ).split(",")
 
 # Application definition

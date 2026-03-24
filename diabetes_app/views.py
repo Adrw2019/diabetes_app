@@ -20,6 +20,9 @@ APP_DIR = os.path.join(settings.BASE_DIR, "diabetes_app")
 MODEL_PATH = os.path.join(APP_DIR, "model.pkl")
 SCALER_PATH = os.path.join(APP_DIR, "scaler.pkl")
 
+DPF_MIN = 0.078
+DPF_MAX = 2.42
+
 
 def safe_load(path):
     try:
@@ -73,6 +76,27 @@ def load_model_and_scaler():
     return model, scaler
 
 
+def normalize_unit(value, min_value, max_value):
+    if max_value <= min_value:
+        return 0.0
+    clamped = max(min(value, max_value), min_value)
+    return (clamped - min_value) / (max_value - min_value)
+
+
+def derive_dpf(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, age):
+    weights = [
+        (glucose, 44, 199, 0.30),
+        (bmi, 18.2, 67.1, 0.25),
+        (age, 18, 90, 0.20),
+        (insulin, 14, 846, 0.10),
+        (skinthickness, 7, 99, 0.05),
+        (bloodpressure, 24, 122, 0.05),
+        (pregnancies, 0, 17, 0.05),
+    ]
+    score = sum(weight * normalize_unit(value, min_value, max_value) for value, min_value, max_value, weight in weights)
+    return DPF_MIN + score * (DPF_MAX - DPF_MIN)
+
+
 def parse_input(request):
     pregnancies = float(request.POST.get("pregnancies", 0))
     glucose = float(request.POST.get("glucose", 0))
@@ -80,9 +104,9 @@ def parse_input(request):
     skinthickness = float(request.POST.get("skinthickness", 0))
     insulin = float(request.POST.get("insulin", 0))
     bmi = float(request.POST.get("bmi", 0))
-    dpf = float(request.POST.get("dpf", 0.373))  # mediana del dataset Pima si no viene
     age = float(request.POST.get("age", 0))
     source_confirmed = request.POST.get("source_confirmed") == "on"
+    dpf = derive_dpf(pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, age)
     return pregnancies, glucose, bloodpressure, skinthickness, insulin, bmi, dpf, age, source_confirmed
 
 
@@ -222,7 +246,7 @@ def predict(request):
             "insulin": f"{insulin:.1f}",
             "bmi": f"{bmi:.1f}",
             "age": f"{age:.1f}",
-            "dpf": f"{dpf:.3f}",
+            "dpf": f"{dpf:.5f}",
             "source_confirmed": source_confirmed,
         }
 

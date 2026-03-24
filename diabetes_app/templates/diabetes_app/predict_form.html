@@ -1,10 +1,10 @@
-<!doctype html>
+﻿<!doctype html>
 {% load static %}
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Diabetes Predictor</title>
+  <title>GlucoIntel</title>
   <link rel="icon" type="image/svg+xml" sizes="any" href="{% static 'diabetes_app/favicon.svg' %}">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
@@ -24,7 +24,7 @@
 <nav class="navbar topbar px-3 py-2">
   <a class="brand d-flex align-items-center gap-2" href="/predict/">
     <img src="{% static 'diabetes_app/logo_white.svg' %}" alt="Logo" width="28" height="28">
-    <span>Diabetes Predictor</span>
+    <span>GlucoIntel</span>
   </a>
   <div class="d-flex align-items-center">
     <span class="user">Hola, {{ request.user.username }}</span>
@@ -50,37 +50,59 @@
             {% csrf_token %}
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label" for="pregnancies">Embarazos (conteo)</label>
+                <label class="form-label" for="pregnancies">
+                  Embarazos (conteo)
+                  <small class="text-muted d-block">0 a 17 según dataset Pima</small>
+                </label>
                 <input class="form-control" id="pregnancies" name="pregnancies" type="number" step="1" min="0" max="17" value="{{ values.pregnancies }}" placeholder="Ej: 1" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="glucose">Glucosa (mg/dL)</label>
+                <label class="form-label" for="glucose">
+                  Glucosa (mg/dL)
+                  <small class="text-muted d-block">44 a 199 mg/dL</small>
+                </label>
                 <input class="form-control" id="glucose" name="glucose" type="number" step="0.1" min="44" max="199" value="{{ values.glucose }}" placeholder="Ej: 110" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="bloodpressure">Presion arterial diastolica (mmHg)</label>
+                <label class="form-label" for="bloodpressure">
+                  Presion arterial diastolica (mmHg)
+                  <small class="text-muted d-block">24 a 122 mmHg</small>
+                </label>
                 <input class="form-control" id="bloodpressure" name="bloodpressure" type="number" step="0.1" min="24" max="122" value="{{ values.bloodpressure }}" placeholder="Ej: 72" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="skinthickness">Grosor de piel tricipital (mm)</label>
+                <label class="form-label" for="skinthickness">
+                  Grosor de piel tricipital (mm)
+                  <small class="text-muted d-block">7 a 99 mm</small>
+                </label>
                 <input class="form-control" id="skinthickness" name="skinthickness" type="number" step="0.1" min="7" max="99" value="{{ values.skinthickness }}" placeholder="Ej: 23" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="insulin">Insulina (mu U/mL)</label>
+                <label class="form-label" for="insulin">
+                  Insulina (mu U/mL)
+                  <small class="text-muted d-block">14 a 846 mu U/mL</small>
+                </label>
                 <input class="form-control" id="insulin" name="insulin" type="number" step="0.1" min="14" max="846" value="{{ values.insulin }}" placeholder="Ej: 94" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="bmi">BMI</label>
+                <label class="form-label" for="bmi">
+                  BMI
+                  <small class="text-muted d-block">18.2 a 67.1</small>
+                </label>
                 <input class="form-control" id="bmi" name="bmi" type="number" step="0.1" min="18.2" max="67.1" value="{{ values.bmi }}" placeholder="Ej: 33.6" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="age">Edad</label>
+                <label class="form-label" for="age">
+                  Edad
+                  <small class="text-muted d-block">18 a 90 años</small>
+                </label>
                 <input class="form-control" id="age" name="age" type="number" step="1" min="18" max="90" value="{{ values.age }}" placeholder="Ej: 35" required>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="dpf">DPF (Diabetes Pedigree Function)</label>
-                <input class="form-control" id="dpf" name="dpf" type="number" step="0.001" min="0.078" max="2.42" value="{{ values.dpf }}" placeholder="Se completa automaticamente" required>
+                <label class="form-label" for="dpf_display">DPF (Diabetes Pedigree Function)</label>
+                <input class="form-control" id="dpf_display" type="text" value="{{ values.dpf|default:'' }}" readonly>
               </div>
+              <input type="hidden" id="dpf" name="dpf" value="{{ values.dpf|default:'0.37300' }}">
               <div class="col-12">
                 <div class="form-check mt-2">
                   <input class="form-check-input" type="checkbox" id="source_confirmed" name="source_confirmed" {% if values.source_confirmed %}checked{% endif %} required>
@@ -100,15 +122,15 @@
       {% if show_result %}
       <div class="card result-card mb-4">
         <div class="card-body p-4 text-center">
-          <h4 class="mb-1">DPF ingresado: {{ dpf }}</h4>
+          <h4 class="mb-1">DPF estimado: {{ dpf }}</h4>
           <p class="mb-3">Probabilidad de diabetes: <strong>{{ probability }}%</strong></p>
-          <!-- Se omite mensaje de 'no riesgo' para evitar falsa sensación de seguridad -->
+          <!-- Se omite mensaje de 'no riesgo' para evitar falsa sensaciÃ³n de seguridad -->
           <a href="/predict/" class="btn btn-outline-primary mt-3">Reiniciar formulario</a>
         </div>
       </div>
       {% endif %}
 
-      <p class="text-center footer">&copy; 2025 Diabetes Predictor</p>
+      <p class="text-center footer">&copy; 2025 GlucoIntel</p>
     </div>
   </div>
 </div>
@@ -122,17 +144,65 @@
     insulin: { min: 14, max: 846, label: "Insulina" },
     bmi: { min: 18.2, max: 67.1, label: "BMI" },
     age: { min: 18, max: 90, label: "Edad" },
-    dpf: { min: 0.078, max: 2.42, label: "DPF" }
   };
 
-  var DEFAULT_DPF = 0.373; // mediana del dataset Pima
+  var dpfConfig = [
+    { field: "glucose", min: 44, max: 199, weight: 0.30 },
+    { field: "bmi", min: 18.2, max: 67.1, weight: 0.25 },
+    { field: "age", min: 18, max: 90, weight: 0.20 },
+    { field: "insulin", min: 14, max: 846, weight: 0.10 },
+    { field: "skinthickness", min: 7, max: 99, weight: 0.05 },
+    { field: "bloodpressure", min: 24, max: 122, weight: 0.05 },
+    { field: "pregnancies", min: 0, max: 17, weight: 0.05 },
+  ];
 
-  function autofillDpfIfEmpty() {
-    var dpfInput = document.getElementById("dpf");
-    var raw = String(dpfInput.value || "").trim();
-    if (!raw) {
-      dpfInput.value = DEFAULT_DPF.toFixed(3);
+  var DPF_MIN = 0.078;
+  var DPF_MAX = 2.42;
+
+  function parseField(fieldId) {
+    var input = document.getElementById(fieldId);
+    if (!input) return NaN;
+    var raw = String(input.value || "").trim();
+    var value = Number(raw.replace(",", "."));
+    return Number.isFinite(value) ? value : NaN;
+  }
+
+  function normalizeValue(value, min, max) {
+    if (!Number.isFinite(value) || max <= min) {
+      return 0;
     }
+    if (value <= min) {
+      return 0;
+    }
+    if (value >= max) {
+      return 1;
+    }
+    return (value - min) / (max - min);
+  }
+
+  function deriveClientDpf() {
+    var score = dpfConfig.reduce(function (acc, item) {
+      var value = parseField(item.field);
+      return acc + item.weight * normalizeValue(value, item.min, item.max);
+    }, 0);
+    var derived = DPF_MIN + score * (DPF_MAX - DPF_MIN);
+    if (!Number.isFinite(derived)) {
+      derived = DPF_MIN;
+    }
+    var dpfInput = document.getElementById("dpf");
+    if (dpfInput) {
+      dpfInput.value = derived.toFixed(5);
+    }
+    var dpfDisplay = document.getElementById("dpf_display");
+    if (dpfDisplay) {
+      var hasFilledFields = fieldIds.every(function (fieldId) {
+        var input = document.getElementById(fieldId);
+        var raw = String(input.value || "").trim();
+        return raw !== "";
+      });
+      dpfDisplay.value = hasFilledFields ? derived.toFixed(5) : "";
+    }
+    return derived;
   }
 
   function validateField(fieldId) {
@@ -159,11 +229,11 @@
   }
 
   function consistencyIssues() {
-    var glucose = Number(String(document.getElementById("glucose").value || "").replace(",", "."));
-    var skinthickness = Number(String(document.getElementById("skinthickness").value || "").replace(",", "."));
-    var insulin = Number(String(document.getElementById("insulin").value || "").replace(",", "."));
-    var bmi = Number(String(document.getElementById("bmi").value || "").replace(",", "."));
-    var dpf = Number(String(document.getElementById("dpf").value || "").replace(",", "."));
+    var glucose = parseField("glucose");
+    var skinthickness = parseField("skinthickness");
+    var insulin = parseField("insulin");
+    var bmi = parseField("bmi");
+    var dpf = deriveClientDpf();
     var issues = [];
 
     if (!Number.isNaN(bmi) && !Number.isNaN(skinthickness) && bmi > 50 && skinthickness < 10) {
@@ -179,7 +249,7 @@
       issues.push("DPF demasiado alto");
     }
     if (!Number.isNaN(glucose)) {
-      var preg = Number(String(document.getElementById("pregnancies").value || "").replace(",", "."));
+      var preg = parseField("pregnancies");
       if (!Number.isNaN(preg) && preg > 10) {
         issues.push("Embarazos >10 son poco frecuentes; verifica el dato");
       }
@@ -209,18 +279,17 @@
     input.addEventListener("input", function () {
       clampField(fieldId, false);
       validateField(fieldId);
-      if (fieldId !== "dpf") {
-        autofillDpfIfEmpty();
-      }
+      deriveClientDpf();
     });
     input.addEventListener("blur", function () {
       clampField(fieldId, true);
       validateField(fieldId);
       input.reportValidity();
+      deriveClientDpf();
     });
   });
 
-  autofillDpfIfEmpty();
+  deriveClientDpf();
 
   document.getElementById("predictForm").addEventListener("submit", function (event) {
     var hasInvalid = fieldIds.some(function (fieldId) { return !validateField(fieldId); });
