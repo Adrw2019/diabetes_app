@@ -8,6 +8,7 @@ Adaptado para deploy en Render (gunicorn + WhiteNoise).
 import os
 from pathlib import Path
 
+import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -72,12 +73,16 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database (sqlite por ahora)
+# Database: usa DATABASE_URL (Postgres) si está definido; si no, cae al sqlite local.
+database_url = os.environ.get("DATABASE_URL")
+default_db_url = database_url or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+ssl_required = bool(database_url) and not DEBUG
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=default_db_url,
+        conn_max_age=600,
+        ssl_require=ssl_required,
+    )
 }
 
 
